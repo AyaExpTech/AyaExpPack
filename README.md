@@ -71,6 +71,7 @@ ver 10.01-1001a
 - twitter…@AyaExpTech
 - Gmail…ayasakaexpresstech@gmail.com
   - 念の為言っとくとGmailは気づかないかも
+  - 
 綾坂こと
 - twitter…@Ayasaka_info
 - Gmail…ayagawap@gmail.com
