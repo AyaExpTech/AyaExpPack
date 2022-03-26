@@ -1,8 +1,7 @@
 # AyasakaExpressPack "AXP" (綾坂急行パック)
 
 ## バージョン
-ver 10.01-1001a  
-2022-03-27
+ver 10.01-1001a
 
 ## 概要
 綾急技研が開発する、Minecraft + RealTrainMod 環境で使用可能な架空車両のパックです。  
