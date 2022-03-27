@@ -64,27 +64,27 @@ AeTSの各機能は基本的に、コマンドにより操作を行います。
 主に駅での使用を想定しています。
 
 ### コマンド
-1次信号(停車駅接近)52
+1次信号(停車駅接近)
 ```txt
 /testfor @e[type=rtm:train,r=3]
 /mctrl @r:3 dm:stopAssist (Int)1
 ```
-2次信号(停車位置まで80m)7
+2次信号(停車位置まで80m)
 ```txt
 /testfor @e[type=rtm:train,r=3]
-/mctrl @r:3 dm:stopAssist (Int)2
+/mctrl @r:3 dm:stopAssist (Int)3
 ```
 3次信号(停車位置)
 ```txt
 /testfor @e[type=rtm:train,r=3]
-/mctrl @r:3 dm:stopAssist (Int)3
+/mctrl @r:3 dm:stopAssist (Int)4
 ```
 
 ### 仕様
 - 1次信号を受け取ると、列車は速度を52km/hまで落として惰性走行を開始します。
 - 2次信号を受け取ると、列車は速度を7km/hまで落として惰性走行をします。
 - 3次信号を受け取ると、列車は停車するまで常用最大制動をかけ、停車後にB1にします。
-- 自動加速機能の設定値が2以上の場合、これらをガン無視します。(後述)
+- 自動加速機能の設定値(accelAssist)が1以上の場合、これらをガン無視します。(後述)
 
 ***
 
@@ -108,13 +108,21 @@ AeTSの各機能は基本的に、コマンドにより操作を行います。
 /mctrl @r:3 dm:accelAssist (Int)3
 
 次の駅まで自動で運転します。(通過なし)
-/mctrl @r:3 dm:accelAssist (Int)3
+/mctrl @r:3 dm:accelAssist (Int)1
 
-自動運転を強制的に
-/mctrl @r:3 dm:accelAssist (Int)3
+自動運転を強制的にOFFにします
+/mctrl @r:3 dm:accelAssist (Int)0
 ```
 
-
+### 仕様
+一部"停車パターン支援"の仕様も解説します
+- 内部的にはaccelAssistという変数(正確にはdataMap)に数値が保存されてます
+  - その数値をコマンドでいじってます
+  - というか全部そうです
+- accelAssistに1以上の整数が指定されていて、かつ(brakeAssist-4)km/hを下回っている場合にP5で加速します
+- この状態で停車パターン支援の1次信号を受け取るとaccelAssistを1減算、stopAssistを1加算します
+- 停車パターン支援はaccelAssistが0のときに発動します
+  - 停車駅の1次信号を受け取ったタイミングでaccelAssistが0、stopAssistが2になって減速するわけです
 
 
 
