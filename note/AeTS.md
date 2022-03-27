@@ -8,7 +8,6 @@ AeTSは、以下の機能を搭載します。
 - 停車パターン支援機能(ver10.01より)
 - 自動加速機能(ver10.01より)
 - 車間維持機能(ver10.01より)
-- 非常制動機能(ver10.01より)
 ```md
 また、将来的に以下の機能を搭載する計画があります。
 - 簡易自動放送機能
@@ -27,7 +26,6 @@ AeTSの各機能は基本的に、コマンドにより操作を行います。
 ## 速度制限アシスト機能(ver10.01\~)
 ### 概要
 走行中の路線の速度制限を越えないよう自動でブレーキをかけます。  
-かけるブレーキは基本的に常用最大ですが、例外的に非常制動をかけることがあります。  
 信号からの停止信号を受信して列車を停めたい場合にもこの機能を使います。  
 
 ### コマンド
@@ -116,7 +114,7 @@ AeTSの各機能は基本的に、コマンドにより操作を行います。
 - 内部的にはaccelAssistという変数(正確にはdataMap)に数値が保存されてます
   - その数値をコマンドでいじってます
   - というか全部そうです
-- accelAssistに1以上の整数が指定されていて、かつ(brakeAssist-1)km/hを下回っている場合にP5で加速します
+- accelAssistに1以上の整数が指定されていて、かつ(brakeAssist-2)km/hを下回っている場合にP5で加速します
 - この状態で停車パターン支援の1次信号を受け取るとaccelAssistを1減算、stopAssistを1加算します
 - 停車パターン支援はaccelAssistが0のときに発動します
   - 停車駅の1次信号を受け取ったタイミングでaccelAssistが0、stopAssistが2になって減速するわけです
@@ -162,3 +160,90 @@ ATACSに近いことをしています。
 ### 仕様
 - 解説するまでもないですね
 - 非常制動かける以外何もしません
+
+***
+
+## 実装方法のメモ
+ようするに今からコードの解説をします
+
+### 共通
+- onUpdateがありますね？そいつが呼び出されるわけです
+- onUpdateが長くなると見づらいから各機能を小分けで関数にしたいね
+
+### まずやること
+車間維持機能がONなら安全維持のための制限速度を先に求めないといけない
+- 関数作って制限速度を求めればいいですね
+- atacs(limit, entity)
+- dataMap "nowRail"と"beforeRail"(どっちもString)の更新処理
+- dataMap "interAssist"が0ならreturn limit
+- そうでない場合はまずlimitでB7の制動距離を求めます
+- で、変数nextをつくります
+- now=dm"nowRail",before=dm"beforeRail",distanceF=0にします
+- そしたらwhile文使って制動距離とdistanceFを比較しながらループ
+    - nowの隣のレールを取得します
+        - おそらくこのときnowがStringなんでevalとかがいりそう
+    - たぶん2つ以上来ますがbeforeでないものが来るまで内部でさらにwhile使って選別します
+        - ここbeforeもStringなのでevalとかがいりそう
+    - beforeじゃない隣のレールを見つけ次第一旦nextにそのレールをStringで入れます
+        - もうこの時点でStringにしてください
+    - そしたらbeforeをnowで上書きしてからnowをnextで上書きします
+        - これで一個先に進みましたね
+    - nowに入ってるレールに列車がいるかを確認します
+    - もしいたらそこでreturn distanceF
+    - いなければdistanceFにnowのレール長を加算します
+- while突破してたらreturn limit
+
+問題点はStringで来てるのを処理できるのかということくらい
+
+### 設計思想的な何か
+ここで初めて各機能が動かせるわけです
+- 最終的にどういう行動を取るかの指令をするコードは一回にしたい
+- とりあえず「なにもしない」(null)を初期値にすることを念頭に置け
+
+### 速度制限アシスト機能(funcBrakeAssist)
+- 結局こいつの最終的なパターンはB7かNか何もしないのいずれかで…
+- じゃあreturnの値は-7か0かnullでいいですね
+- dm:brakeAssistが0ならreturn null確定なので最後のreturnで処理すれば良くて
+- そうでない場合は-7か0の可能性あり
+- 「dm:brakeAssist < entity.getSpeed()」なら制限超過
+    - このときにentity.getNotch()が-7でないならreturn -7
+    - 非常制動その他諸々でB8になる可能性を考えましたがそれはonUpdateで処理
+- 「(dm:brakeAssist - 1) > entity.getSpeed()」なら制動解除
+    - このときにentity.getNotch()が0でないならreturn 0
+- この時点でreturnしてなければreturn nullで大丈夫
+
+### 停車パターン支援機能(funcStopAssist)
+内部で自動加速機能のfunctionを呼び出します
+- まずaccelAssistが1以上なら停車パターンはガン無視しなきゃいけません
+- しかもその場合は自動加速機能の値を返す必要があります
+- じゃあこっから自動加速機能のfunctionを呼べば良いね
+- つまりガン無視条件該当の場合は「return funcAccelAssist(…)」なわけです
+- ということは以下はガン無視条件に該当しない(else)場合ですね
+- 先にaccelAssist=4を処理します
+    - この場合は「停止してなければreturn -7」です、強制で止めましょう
+    - 停止してればaccelAssistを0に変えてあげてreturn -1で…
+- 次にaccelAssistが2か3の場合を処理します、とりあえずif作って中で変数stopLimitを宣言だけしてください
+    - さらに中でswitch文書いて2ならstopLimitには52を、3ならstopLimitには7を入れます
+    - そしたらあとは共通じゃないですか
+        - stopLimit < entity.getSpeed()なら速度落とさなきゃいけないので強制return -7
+        - stopLimit >= entity.getSpeed()かつ今B7ならreturn 0
+- この時点でreturnされてなかったらnullを返せば良いはずです
+    - 想定外の操作をした場合とnullの場合しかここに到達しないはずなので…
+
+### 自動加速機能(funcAccelAssist)
+こいつはonUpdateじゃなくて停車パターン支援機能から呼び出されます
+- とはいえやることは同じです、ノッチを返せば良いんです
+- dm:accelAssistが1未満なら絶対nullなんでif文
+    - (dm:brakeAssist - 2) > entity.getSpeed() ならreturn 5
+- あれ？それ以外全部return nullでいいじゃん
+    - 制限-2以上制限以下なら加速or減速→惰性の2パターンなのでここではなにもしなくていい
+
+### 話はonUpdateに戻って…
+- とりあえず変数controlを宣言します
+- funcBrakeAssist(limit, entity)でcontrolを上書きします
+- funcStopAssist(limit, entity)がnullでなければそれでcontrolを上書きします
+- そしたらcontrolは今列車がとるべきNotchになってるはずなんです
+- そしたらentity.setNotch(control)で完成ですね！
+
+あとはこれをコードに起こせばいいだけです頑張ってください  
+2022-03-28 02:17 綾坂こと
