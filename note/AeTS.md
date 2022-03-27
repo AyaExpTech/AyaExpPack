@@ -116,8 +116,7 @@ AeTSの各機能は基本的に、コマンドにより操作を行います。
 - 内部的にはaccelAssistという変数(正確にはdataMap)に数値が保存されてます
   - その数値をコマンドでいじってます
   - というか全部そうです
-- accelAssistに1以上の整数が指定されていて、かつ(brakeAssist-4)km/hを下回っている場合にP5で加速します
-  - 上回ってて今P5ならNにします
+- accelAssistに1以上の整数が指定されていて、かつ(brakeAssist-1)km/hを下回っている場合にP5で加速します
 - この状態で停車パターン支援の1次信号を受け取るとaccelAssistを1減算、stopAssistを1加算します
 - 停車パターン支援はaccelAssistが0のときに発動します
   - 停車駅の1次信号を受け取ったタイミングでaccelAssistが0、stopAssistが2になって減速するわけです
