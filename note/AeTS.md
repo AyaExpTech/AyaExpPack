@@ -219,10 +219,10 @@ ATACSに近いことをしています。
 - じゃあこっから自動加速機能のfunctionを呼べば良いね
 - つまりガン無視条件該当の場合は「return funcAccelAssist(…)」なわけです
 - ということは以下はガン無視条件に該当しない(else)場合ですね
-- 先にaccelAssist=4を処理します
+- 先にstopAssist=4を処理します
     - この場合は「停止してなければreturn -7」です、強制で止めましょう
     - 停止してればaccelAssistを0に変えてあげてreturn -1で…
-- 次にaccelAssistが2か3の場合を処理します、とりあえずif作って中で変数stopLimitを宣言だけしてください
+- 次にstopAssistが2か3の場合を処理します、とりあえずif作って中で変数stopLimitを宣言だけしてください
     - さらに中でswitch文書いて2ならstopLimitには52を、3ならstopLimitには7を入れます
     - そしたらあとは共通じゃないですか
         - stopLimit < entity.getSpeed()なら速度落とさなきゃいけないので強制return -7
