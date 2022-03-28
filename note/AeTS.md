@@ -180,19 +180,15 @@ ATACSに近いことをしています。
 - dataMap "interAssist"が0ならreturn limit
 - そうでない場合はまずlimitでB7の制動距離を求めます
 - で、変数nextをつくります
-- now=dm"nowRail",before=dm"beforeRail",distanceF=0にします
+- findRail=dm"nowRail",foundRail=dm"beforeRail",distanceF=0にします
 - そしたらwhile文使って制動距離とdistanceFを比較しながらループ
-    - nowの隣のレールを取得します
-        - おそらくこのときnowがStringなんでevalとかがいりそう
-    - たぶん2つ以上来ますがbeforeでないものが来るまで内部でさらにwhile使って選別します
-        - ここbeforeもStringなのでevalとかがいりそう
-    - beforeじゃない隣のレールを見つけ次第一旦nextにそのレールをStringで入れます
-        - もうこの時点でStringにしてください
-    - そしたらbeforeをnowで上書きしてからnowをnextで上書きします
-        - これで一個先に進みましたね
-    - nowに入ってるレールに列車がいるかを確認します
+    - findRailの隣のレールを取得します
+    - たぶん2つ以上来ますがfoundRailでないものが来るまで内部でさらにwhile使って選別します
+    - foundRailじゃない隣のレールを見つけ次第一旦ローカル変数nextRailにそのレールを入れます
+    - そしたらfoundをfindで上書きしてからfindをnextで上書きします
+    - foundに入ってるレールに列車がいるかを確認します
     - もしいたらそこでreturn distanceF
-    - いなければdistanceFにnowのレール長を加算します
+    - いなければdistanceFにfindのレール長を加算します
 - while突破してたらreturn limit
 - 追記、直でrailMapをStringで保存しようと思ったんですが戻せなかったので1tick前の車両のx,y,z座標を保存する方針で
 
