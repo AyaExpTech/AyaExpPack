@@ -194,6 +194,7 @@ ATACSに近いことをしています。
     - もしいたらそこでreturn distanceF
     - いなければdistanceFにnowのレール長を加算します
 - while突破してたらreturn limit
+- 追記、直でrailMapをStringで保存しようと思ったんですが戻せなかったので1tick前の車両のx,y,z座標を保存する方針で
 
 問題点はStringで来てるのを処理できるのかということくらい
 
