@@ -15698,7 +15698,7 @@ Object "Speed" {
 		4 V(4 1 7 3) M(4) UV(0.565397 0.286964 0.572573 0.286964 0.572573 0.301342 0.572573 0.302322)
 	}
 }
-Object "Controler" {
+Object "Controller" {
 	depth 0
 	folding 0
 	scale 1 1 1
