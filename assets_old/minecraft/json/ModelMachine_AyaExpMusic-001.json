@@ -1,0 +1,12 @@
+{
+ "name":"AXP_music_001",
+ "tags": "ayasaka",
+ "model":{
+ 	"modelFile":"AXP_box.mqo",
+ 	"textures":[["tex","textures/melody/model_tex.png",AlphaBlend"]]
+ },
+ "buttonTexture":"textures/button/music1.png",
+ "machineType":"Gate",
+ "sound_OnAcive":"",
+ "sound_Running":"sound:ayamelody.daydreamcafe"
+}

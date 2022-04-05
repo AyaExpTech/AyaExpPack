@@ -1,0 +1,13 @@
+{
+"train.rtm_mcta_doorclose_mi": {"category": "neutral","sounds": ["train/rtm_mcta_doorclose_mi"]},
+"train.rtm_mcta_dooropen_mi": {"category": "neutral","sounds": ["train/rtm_mcta_dooropen_mi"]},
+"train.rtm_mcta_none": {"category": "neutral","sounds": ["train/rtm_mcta_none"]},
+ 
+"ayamelody.daydreamcafe": {"category":"neutral","sounds":["ayamelody/daydreamcafe"]},
+
+"ayamelody.una": {"category":"neutral","sounds":["ayamelody/una"]}
+ 
+ 
+ 
+}
+  

@@ -20,6 +20,19 @@ importPackage(Packages.net.minecraft.util.math);
  */
 
 /**
+ * 必要な関数一覧
+ * ・onUpdate(entity, scriptExecuter) … メインループ関数。毎tickこいつが呼び出される
+ * ┣・funcAssist(entity, data) … 速度アシスト(減速+加速)機能の関数。
+ * ┣・funcStop(entity, data) … 停車支援機能の関数。
+ * ┣・funcAtacs(entity, data) … 車間維持機能の関数。
+ * ┃┣・getRailMap(entity, x, y, z) … railMapを取得する関数。
+ * ┃┗・getRMfromRP(entity, rp) … railPositionからrailMapを取得する関数。
+ * ┗・funcEB(entity, data) … 非常制動機能の関数。
+ * ・calcBrakingDistance(speed, notch) … 速度とノッチから制動距離を求める関数。
+ * ・calcMaxSpeed(braking, notch) … 制動距離とノッチから速度を求める関数。
+ */
+
+/**
  * 使用するデータマップ一覧
  * ・コマンドで操作するデータマップ
  * @param {Int} limit 現在の制限速度。単位はkm/h
@@ -52,6 +65,11 @@ importPackage(Packages.net.minecraft.util.math);
  * 10…beforePosZ
  */
 
+/**
+ * メインループ関数。MOD本体から毎tick呼び出される。
+ * @param {TileEntity} entity 列車のTileEntity
+ * @param {any} scriptExecuter なにこれ…
+ */
 function onUpdate(entity, scriptExecuter) {
     /**
      * 共通で書かないと"XXX is not defined"をやらかしまくるのでコピペしておけ
@@ -69,11 +87,11 @@ function onUpdate(entity, scriptExecuter) {
     /**
      * 車間維持機能用に在線情報を更新する
      */
-    //まずdeferとnowのRailBaseを取得して変数に入れる
-    nowRB = getRBfromPOS(entity, entity.field_70165_t, entity.field_70163_u, entity.field_70161_v);
-    deferRB = getRBfromPOS(entity, data[5], data[6], data[7]);
-    //deferとnowが異なる場合は線路切り替わったのでbeforeをdeferで更新。
-    if (String(nowRB) != String(deferRB)) {
+    //まずdeferとnowのRailMapを取得して変数にぶちこむ
+    nowRM = getRailMap(entity, entity.field_70165_t, entity.field_70163_u, entity.field_70161_v);
+    deferRM = getRailMap(entity, data[5], data[6], data[7]);
+    //deferとnowが異なる場合はbeforeをdeferにしなきゃいけない
+    if (String(nowRM) != String(deferRM)) {
         dataMap.setDouble("beforePosX", data[5], SAVE);
         dataMap.setDouble("beforePosY", data[6], SAVE);
         dataMap.setDouble("beforePosZ", data[7], SAVE);
@@ -82,6 +100,7 @@ function onUpdate(entity, scriptExecuter) {
     dataMap.setDouble("deferPosX", entity.field_70165_t, SAVE);
     dataMap.setDouble("deferPosY", entity.field_70163_u, SAVE);
     dataMap.setDouble("deferPosZ", entity.field_70161_v, SAVE);
+    //この時点でdeferが今tickの座標、beforeが一個前のレール時点の座標になったので持ち越し可能
 
     /**
      * 配列ctrlsに各機能の要求ノッチを入れる
@@ -91,26 +110,23 @@ function onUpdate(entity, scriptExecuter) {
      * ctrls[3] … 非常制動
      */
     var ctrls = [funcAssist(entity, data), funcStop(entity, data), funcAtacs(entity, data), funcEB(entity, data)];
-    //変数controlに最終的なノッチを入れる
+    /**
+     * 条件分岐で変数controlにノッチを入れてうぇーい
+     */
     var control = null;
     if (ctrls[3] != null) {
-        //非常制動は最優先
         control = ctrls[3];
     } else {
         if (ctrls[2] != null) {
-            //次に優先すべきは車間維持
             control = ctrls[2];
         } else {
             if (ctrls[1] != null) {
-                //次に優先すべきは停車支援
                 control = ctrls[1];
             } else {
-                //最後に速度アシスト
                 control = ctrls[0];
             }
         }
     }
-    //で、最終的なノッチを適用する
     if (control != null) {
         entity.setNotch(control);
     }
@@ -128,27 +144,26 @@ function funcAssist(entity, data) {
     var resourceState = entity.getResourceState();
     var dataMap = resourceState.getDataMap();
     var SAVE = 3;
+    //とりあえずミスを起こさないように現在の速度を求めとく
     var speed = entity.getSpeed() * 72;
     //制限速度をひっぱってくるのにわざわざdata[n]って書くの嫌だし見づらいので変数に出しときます
     var limit = data[0];
-    //そもそも数値を返すのはONのときだけなのでif書こう
     if (data[1] == 1 || data[1] == 2) {
-        /**
-         * 制限速度を超過しているときは必ず-7
-         * 制限速度を1km/h以上下回っていてノッチが-7なら0(惰性)
-         * 制限速度を3km/h以上下回っていてmode=2なら5
-         */
+        //数値を返すのはONのとき
         if (limit < speed) {
+            NGTLog.debug("l=155,n=-7");
             return -7;
         }
-        if (entity.getNotch() == -7 && speed < limit - 1) {
+        if (entity.getNotch() == -7 && speed <= limit - 1) {
+            NGTLog.debug("l=159,n=0");
             return 0;
         }
-        if (data[1] == 2 && speed < limit - 3) {
+        if (data[1] == 2 && speed <= limit - 3) {
+            NGTLog.debug("l=163,n=5");
             return 5;
         }
     }
-    //この時点でreturnしてなければnullを返してOK
+    //この時点でreturnしてなかったらnullです
     return null;
 }
 
@@ -164,33 +179,30 @@ function funcStop(entity, data) {
     var resourceState = entity.getResourceState();
     var dataMap = resourceState.getDataMap();
     var SAVE = 3;
+    //とりあえずミスを起こさないように現在の速度を求めとく
     var speed = entity.getSpeed() * 72;
-    //remainはよく使うので変数で持ってくる
+    //remainはよく使うので変数で持ってきてください
     var remain = data[2];
-    //remainが-100の状態をOFFとみなしてnullを先行で返す
     if (remain == -100) {
         return null;
     }
-    //上のnullで抜けてなければONとみなして距離を減算
     dataMap.setDouble("remain", remain - entity.getSpeed(), SAVE);
-    //残り1m未満ならB7で止めるかOFFにするかのどっちかです。オーバーランもここに含みます
     if (remain < 1) {
         if (speed == 0) {
             dataMap.setDouble("remain", -100.0, SAVE);
         } else {
-            //AssistMode=2を1にする仕様にしないと止まったあとまたすぐ動いちゃう
-            if (data[1] == 2) {
-                dataMap.setInt("assistMode", 1, SAVE);
+            if (remain != -100) {
+                dataMap.setInt("assistMode", 0, SAVE);
+                NGTLog.debug("l=197,n=-7");
+                return -7;
             }
         }
-        //ここに書くことで残り1m未満のとき確実にここを抜けるのを防ぐ
+    }
+    var brakeD = calcBrakingDistance(speed, -7);
+    if (1 <= remain && remain <= brakeD && remain != -100) {
+        NGTLog.debug("l=204,n=-7");
         return -7;
     }
-    //残り1m以上あるなら制動距離と残り距離を比較して必要ならブレーキ
-    if (remain <= calcBrakingDistance(speed, -7)) {
-        return -7;
-    }
-    //ここまでたどり着いてたらnull
     return null;
 }
 
@@ -206,77 +218,70 @@ function funcAtacs(entity, data) {
     var resourceState = entity.getResourceState();
     var dataMap = resourceState.getDataMap();
     var SAVE = 3;
+    //とりあえずミスを起こさないように現在の速度を求めとく
     var speed = entity.getSpeed() * 72;
-    //とりあえずONじゃなければ全部すっ飛ばしてnullでいいのでifで囲います
+    //またlimitを持ってきます
+    var limit = data[0];
+    //limitが0以下だと困る気がするのでその場合10に読み替え
+    if (limit <= 0) {
+        limit = 10;
+    }
+    //ループ処理使って先行車両までの距離を求める必要が…
+    // distanceFは前方車両までの距離(m)、distanceBはlimit km/hの制動距離(m)、findRailは探索中のレール、foundRailは一個前に探索してたレール
+    var distanceF = 0;
+    var distanceB = calcBrakingDistance(limit, -7);
+    var findRail = getRailMap(entity, entity.field_70165_t, entity.field_70163_u, entity.field_70161_v);
+    var foundRail = getRailMap(entity, data[8], data[9], data[10]);
+    //findRailとfoundRailにはrailBaseが入ってます。関数名に惑わされるな
+    //条件はdistanceFよりdistanceBの方が大きい(まだ探索しなきゃいけない)間なのでそれ
+    NGTLog.debug("1A");
+    while (distanceF < distanceB) {
+        var railMaps = [getRMfromRB(entity, findRail), getRMfromRB(entity, foundRail)]; //find,found
+        var searchRailA = getRBfromRP(entity, railMaps[0].getStartRP());
+        var searchRailB = getRBfromRP(entity, railMaps[0].getEndRP());
+        //foundと一致しないほうが次に進むべきrail
+        var nextRail = null;
+        NGTLog.debug("2A");
+        if (railMaps[1] == getRMfromRB(entity, searchRailA)) {
+            NGTLog.debug("3A");
+            nextRail = searchRailB;
+        }
+        if (railMaps[1] == getRMfromRB(entity, searchRailB)) {
+            NGTLog.debug("4A");
+            nextRail = searchRailA;
+        }
+        if (nextRail === null) {
+            NGTLog.debug("5A");
+            break;
+        }
+        foundRail = findRail;
+        findRail = nextRail;
+        // findRailについて考えなきゃいけなくて
+        var onRail = findRail.isTrainOnRail(); // boolean型
+        var length = getRMfromRB(entity, findRail).getLength(); //Double…?
+        NGTLog.debug("6A");
+        if (onRail) {
+            // isTrainOnRailがtrueならwhileからbrakeしなきゃいけなくて…
+            NGTLog.debug("7A");
+            distanceF = distanceF + 5;
+            break;
+        } else {
+            NGTLog.debug("8A");
+            // findRailのレール長を加算して再ループ
+            NGTLog.debug("distanceF=" + distanceF + "→" + (distanceF + length));
+            distanceF = distanceF + length;
+        }
+    }
+    //この機能がONじゃなかったらB7出さなくていい
     if (data[3] == 1) {
-        //またlimitを持ってきます
-        var limit = data[0];
-        //limitが0以下だと困る気がするのでその場合10に読み替え
-        if (limit <= 0) {
-            limit = 10;
-        }
-        //地獄の"先頭車両までの距離計測"でございます
-        var fDis = 0; //最終的に前方車両までの距離になる
-        var bDis = calcBrakingDistance(limit, -7); //(limit)km/hの制動距離
-        //findの初期位置は現在位置、foundの初期位置はその一つ前
-        //どちらもRailBaseが入ってるしRailBaseで比較していきます
-        var findRB = getRBfromPOS(entity, entity.field_70165_t, entity.field_70163_u, entity.field_70161_v);
-        var foundRB = getRBfromPOS(entity, data[8], data[9], data[10]);
-        NGTLog.debug("find=" + findRB + ", found=" + foundRB);
-        //このあとのwhileで使う変数を定義します
-        var searchA;
-        var searchB;
-        var onRail;
-        var length;
-        //くそわかりづらいが前方車両までの距離が制動距離を上回るまでループなのでwhile文
-        while (fDis < bDis) {
-            //searchA,BにfindRBの隣のRailBaseを入れたいが経由地が多すぎる(Base→Core→Map→隣Position→隣Base)
-            searchA = getRBfromRP(entity, getStartRPfromRM(entity, getRMfromRC(entity, getRCfromRB(entity, findRB))));
-            searchB = getRBfromRP(entity, getEndRPfromRM(entity, getRMfromRC(entity, getRCfromRB(entity, findRB))));
-            var rNext; //巻き上げます
-            //foundRBじゃない方が次に進むべきRail
-            NGTLog.debug("A=" + searchA + ", B=" + searchB + ", found=" + foundRB);
-            if (String(foundRB) == String(searchA)) {
-                rNext = searchB;
-            }
-            if (String(foundRB) == String(searchB)) {
-                rNext = searchA;
-            }
-            //一応breakのパターン挟み込んでます
-            if (rNext == null) {
-                NGTLog.debug("null-break!(d=" + fDis + "m)");
-                break;
-            }
-            //次のwhileを考えて移動するイメージ
-            foundRB = findRB;
-            findRB = rNext;
-            //findRBからそのRailに列車がいるかとそのレールの長さを取得
-            onRail = getRCfromRB(entity, findRB).isTrainOnRail(); //RailCoreからとれるっぽい
-            length = getRCfromRB(entity, findRB).getLength //RailCoreからとれるっぽい
-            NGTLog.debug("isOnRail=" + onRail + ",l=" + length + "m");
-            if (onRail) {
-                //isTrainOnRailがtrueだったらそこでwhileから強制breakです
-                fDis = fDis + 2;
-                NGTLog.debug("true-break!(d=" + fDis + "m)");
-                break;
-            } else {
-                //足して再ループ
-                fDis = fDis + length;
-                NGTLog.debug("d=" + fDis + "m");
-            }
-        }
-        //fDisの距離で止まれる最高速度を求めて現在速度と比較して必要ならブレーキ
-        var max = calcMaxSpeed(fDis - 1, -7); //猶予1mとる
-        NGTLog.debug("max=" + max + "km/h");
-        //maxが5km/h切ってたらもう0と読み替えろ、別にいいだろそんくらい
-        if (max < 5) {
-            max = 0;
-        }
+        NGTLog.debug("distanceF=" + distanceF);
+        var max = calcMaxSpeed(distanceF - 5, -7);
+        NGTLog.debug("max=" + max);
         if (max < speed) {
+            NGTLog.debug("l=270,n=-7");
             return -7;
         }
     }
-    //ここまで来たらnull
     return null;
 }
 
@@ -286,8 +291,8 @@ function funcAtacs(entity, data) {
  * @param {Array} data dataMapを取得したものをまとめてある配列
  */
 function funcEB(entity, data) {
-    //もう書くまでもないでしょ
     if (data[4] == 1) {
+        NGTLog.debug("l=284,n=-8");
         return -8;
     }
     return null;
@@ -300,115 +305,46 @@ function funcEB(entity, data) {
  */
 
 /**
- * 座標→RailBase
+ * entityが乗ってるレールのrailBaseを取得する関数 by Kaiz_JP
+ * x,y,zをすべて指定するとその座標をもとにして取得するので前tickから座標を持ち越せば前tickのあれができます
  * @param {TileEntity} entity 列車のTileEntity
- * @param {Double} x X座標
- * @param {Double} y Y座標
- * @param {Double} z Z座標
- * @returns {RailBase} RailBase
+ * @param {Double} x X座標(Double型)
+ * @param {Double} y Y座標(Double型)
+ * @param {Double} z Z座標(Double型)
+ * @returns RailBase
  */
-function getRBfromPOS(entity, x, y, z) {
+function getRailMap(entity, x, y, z) {
     //x,y,zをもとに出すんで今の場所を指定したいときは以下のように呼び出してください
-    //getRBfromPOS(entity, entity.field_70165_t, entity.field_70163_u, entity.field_70161_v)
+    //getRailMap(entity, entity.field_70165_t, entity.field_70163_u, entity.field_70161_v)
     return TileEntityLargeRailBase.getRailFromCoordinates(entity.field_70170_p, x, y + 1, z, 0);
 }
 
 /**
- * RailBase→RailCore
- * @param {TileEntity} entity 列車のTileEntity
- * @param {RailBase} rb RailBase
- * @returns {RailCore} RailCore
+ * railBaseからrailMapを返す関数です、諸事情でわけました
+ * @param {TileEntity} entity entity
+ * @param {tileEntityRailBase} rb railBase
+ * @returns railMap
  */
-function getRCfromRB(entity, rb) {
+function getRMfromRB(entity, rb) {
     if (rb != null) {
-        return rb.getRailCore();
+        var tileEntityRailCore = rb.getRailCore();
+        if (tileEntityRailCore instanceof TileEntityLargeRailSwitchCore) {
+            return tileEntityRailCore.getSwitch().getNearestPoint(entity.getBogie(entity.getTrainDirection())).getActiveRailMap(entity.field_70170_p);
+        } else {
+            return tileEntityRailCore.getRailMap(entity.getBogie(entity.getTrainDirection()));
+        }
     }
     return null;
 }
 
 /**
- * RailCore→RailBase
- * @param {TileEntity} entity 列車のTileEntity
- * @param {RailBase} rc RailCore
- * @returns {RailBase} RailBase
- */
-function getRBfromRC(entity, rc) {
-    if (rc != null) {
-        return getRBfromRM(entity, getRMfromRC(entity, rc));
-    }
-    return null;
-}
-
-/**
- * RailMap→RailBase
- * @param {TileEntity} entity 列車のTileEntity
- * @param {RailMap} rm RailMap
- * @returns {RailBase} RailBase
- */
-function getRBfromRM(entity, rm) {
-    if (rm != null) {
-        return rm.getRailBase();
-    }
-    return null;
-}
-
-/**
- * RailCore→RailMap
- * @param {TileEntity} entity 列車のTileEntity
- * @param {RailCore} rc RailCore
- * @returns {RailMap} RailMap
- */
-function getRMfromRC(entity, rc) {
-    if (rc instanceof TileEntityLargeRailSwitchCore) {
-        return rc.getSwitch().getNearestPoint(entity.getBogie(entity.getTrainDirection())).getActiveRailMap(entity.field_70170_p);
-    } else {
-        return rc.getRailMap(entity.getBogie(entity.getTrainDirection()));
-    }
-}
-
-/**
- * RailMap→RailPosition(StartRP)
- * @param {TileEntity} entity 列車のTileEntity
- * @param {RailMap} rm RailMap
- * @returns {RailPosition} Start側RailPosition
- */
-function getStartRPfromRM(entity, rm) {
-    if (rm != null) {
-        return rm.getStartRP();
-    }
-}
-
-/**
- * RailMap→RailPosition(EndRP)
- * @param {TileEntity} entity 列車のTileEntity
- * @param {RailMap} rm RailMap
- * @returns {RailPosition} End側RailPosition
- */
-function getEndRPfromRM(entity, rm) {
-    if (rm != null) {
-        return rm.getEndRP();
-    }
-}
-
-/**
- * RailPosition→RailBase
- * @param {TileEntity} entity 列車のTileEntity
- * @param {RailPosition} rp RailPosition
- * @returns {RailBase} RailBase
+ * railPositionからrailMapを取得 by Kaiz_JP
+ * @param {TileEntity} entity entity
+ * @param {RailPosition} rp railPosition
  */
 function getRBfromRP(entity, rp) {
     //rpはRailPosition worldはWorld
-    if (rp != null) {
-        var x = rp.blockX;
-        var y = rp.blockY;
-        var z = rp.blockZ;
-        var r = getRBfromPOS(entity, x, y, z);
-        if (r instanceof TileEntityLargeRailNormalCore) {
-            return getRBfromRC(entity, r);
-        }
-        return r;
-    }
-    return null;
+    return BlockUtil.getTileEntity(entity.field_70170_p, rp.getNeighborBlockPos()); //entity.field_70170_pがworld
 }
 
 /**
